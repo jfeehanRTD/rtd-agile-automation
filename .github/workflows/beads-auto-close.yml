@@ -1,0 +1,77 @@
+name: Beads Auto-Close
+
+# Triggers when a PR is merged to main
+# Copy this file to your project's .github/workflows/ directory
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  auto-close:
+    name: Close Beads Task
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install Beads
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Extract issue key from PR
+        id: extract
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          PR_NUM="${{ github.event.pull_request.number }}"
+
+          # Matches keys like TNG-123, PROJ-456 from title or branch
+          ISSUE_KEY=$(echo "$PR_TITLE" | grep -oE '[A-Z]+-[0-9]+' | head -1 || true)
+          if [ -z "$ISSUE_KEY" ]; then
+            ISSUE_KEY=$(echo "$BRANCH" | grep -oE '[A-Z]+-[0-9]+' | head -1 || true)
+          fi
+
+          echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
+          echo "pr_num=$PR_NUM" >> $GITHUB_OUTPUT
+
+          if [ -n "$ISSUE_KEY" ]; then
+            echo "Found issue key: $ISSUE_KEY from PR #$PR_NUM"
+          else
+            echo "No issue key found in PR title or branch — skipping"
+          fi
+
+      - name: Close matching Beads task
+        if: steps.extract.outputs.issue_key != ''
+        run: |
+          ISSUE_KEY="${{ steps.extract.outputs.issue_key }}"
+          PR_NUM="${{ steps.extract.outputs.pr_num }}"
+
+          BEADS_ID=$(bd list --json 2>/dev/null | jq -r \
+            --arg key "$ISSUE_KEY" \
+            '.[] | select(
+              (.external_ref != null and (.external_ref | test($key))) or
+              (.title | test($key))
+            ) | .id' \
+            | head -1 || true)
+
+          if [ -n "$BEADS_ID" ]; then
+            bd close "$BEADS_ID" --reason "Merged in PR #$PR_NUM" --json
+            echo "Closed beads task $BEADS_ID ($ISSUE_KEY) via PR #$PR_NUM"
+          else
+            echo "No beads task found matching $ISSUE_KEY — skipping"
+          fi
+
+      - name: Sync to Jira
+        if: steps.extract.outputs.issue_key != ''
+        env:
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          if [ -n "$JIRA_API_TOKEN" ]; then
+            bd jira sync --push 2>/dev/null || echo "Jira sync skipped (not configured in CI)"
+          else
+            echo "JIRA_API_TOKEN not set — skipping Jira sync"
+          fi

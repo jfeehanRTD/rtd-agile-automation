@@ -1,0 +1,30 @@
+#!/usr/bin/env sh
+#
+# pre-push hook — warn if pushing a branch with no TNG key
+#
+BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+
+# Only check feature branches, not main
+case "$BRANCH" in
+  main|master|develop|beads-metadata) exit 0 ;;
+esac
+
+TNG_KEY=$(echo "$BRANCH" | grep -oE 'TNG-[0-9]+' | head -1)
+if [ -z "$TNG_KEY" ]; then
+  echo ""
+  echo "WARNING: Branch '$BRANCH' has no TNG issue key."
+  echo "Consider naming branches as: TNG-xxx-description"
+  echo ""
+fi
+
+# Show claimed task reminder
+if command -v bd >/dev/null 2>&1; then
+  CLAIMED=$(bd list --status in_progress --json 2>/dev/null | jq -r '.[] | select(.assignee != null) | .id' 2>/dev/null | head -1)
+  if [ -n "$CLAIMED" ] && [ -n "$TNG_KEY" ]; then
+    echo "  bd: You're working on $CLAIMED"
+    echo "  Don't forget: bd close $CLAIMED --reason 'Merged in PR'"
+    echo ""
+  fi
+fi
+
+exit 0

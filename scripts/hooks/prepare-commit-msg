@@ -1,0 +1,33 @@
+#!/usr/bin/env sh
+#
+# prepare-commit-msg hook — auto-prepend TNG-xxx from branch name to commit message
+#
+# Skips if:
+#   - commit message already contains TNG-xxx
+#   - not on a TNG branch
+#   - it's a merge/squash/amend commit
+#
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="$2"
+
+# Skip for merge, squash, and amend commits
+case "$COMMIT_SOURCE" in
+  merge|squash) exit 0 ;;
+esac
+
+# Get current branch
+BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+[ -z "$BRANCH" ] && exit 0
+
+# Extract TNG key from branch name
+TNG_KEY=$(echo "$BRANCH" | grep -oE 'TNG-[0-9]+' | head -1)
+[ -z "$TNG_KEY" ] && exit 0
+
+# Skip if message already contains the key
+if grep -q "$TNG_KEY" "$COMMIT_MSG_FILE" 2>/dev/null; then
+  exit 0
+fi
+
+# Prepend key to commit message
+ORIG_MSG=$(cat "$COMMIT_MSG_FILE")
+echo "$TNG_KEY — $ORIG_MSG" > "$COMMIT_MSG_FILE"
