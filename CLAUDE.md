@@ -23,16 +23,18 @@ Lightweight agile workflow automation for RTD dev teams, built on [Beads](https:
 - `docs/cito-pre-email.md` — Deputy CITO pre-email (sent)
 - `docs/beads-servicenow-talking-points.md` — ServiceNow integration pitch
 
-## Definition of Done (4 Checks)
+## Definition of Done (5 Checks)
 
 1. Code in PR and approved by at least one reviewer
 2. Tests passing (Build & Test + Test Results CI checks)
 3. PR merged to main
 4. SonarCloud analysis passed (no new warnings)
+5. User story doc exists (`docs/stories/TNG-XXX.md`) — exempt for bug fixes & config changes
 
 ## Related Projects
 
 - **tis-next-gen** (`~/projects/tisng/tis-next-gen`): Primary project using this automation
+  - GitHub repo: `rideRTD/tis-next-gen` (org is rideRTD, not jfeehanRTD)
   - Beads initialized with Dolt backend, Jira sync configured (TNG project)
   - Metadata branch: `beads-metadata` (main is protected)
   - Jira: `rtddevteams.atlassian.net`, project TNG
